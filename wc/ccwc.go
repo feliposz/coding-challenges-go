@@ -40,90 +40,97 @@ func main() {
 	var fileCount, totalBytes, totalLines, totalWords, totalChars, totalMaxLineLengths int64
 
 	for _, name := range flag.Args() {
-		file, err := os.Open(name)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			continue
-		}
-		defer file.Close()
-
-		stat, err := file.Stat()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			continue
-		}
-
-		var lines, words, chars, maxLineLength int64
-
-		if countLines || countWords || countChars || maxLengths {
-			reader := bufio.NewReader(file)
-			if countWords || countChars || maxLengths {
-				for {
-					text, err := reader.ReadString('\n')
-					if err != nil {
-						if err == io.EOF {
-							break
-						}
-						panic(err)
-					}
-					prev := ' '
-					lineLength := int64(0)
-					for _, curr := range text {
-						if !unicode.IsSpace(curr) && unicode.IsSpace(prev) {
-							words++
-						}
-						prev = curr
-						if curr == '\t' {
-							// adjust for tab stops
-							lineLength = (lineLength + 8) / 8 * 8
-						} else if curr != '\n' && curr != '\r' {
-							lineLength++
-						}
-						chars++
-					}
-					lines++
-					maxLineLength = max(maxLineLength, lineLength)
-				}
-			} else {
-				// faster, just counting lines
-				for {
-					_, err := reader.ReadString('\n')
-					if err != nil {
-						if err == io.EOF {
-							break
-						}
-						panic(err)
-					}
-					lines++
-				}
-			}
-		}
-
-		if countLines {
-			fmt.Printf("%6d ", lines)
-			totalLines += lines
-		}
-		if countWords {
-			fmt.Printf("%6d ", words)
-			totalWords += words
-		}
-		if countChars {
-			fmt.Printf("%6d ", chars)
-			totalChars += chars
-		}
-		if countBytes {
-			bytes := stat.Size()
-			fmt.Printf("%6d ", bytes)
-			totalBytes += bytes
-		}
-		if maxLengths {
-			fmt.Printf("%6d ", maxLineLength)
-			totalMaxLineLengths = max(totalMaxLineLengths, maxLineLength)
-		}
-		fmt.Printf("%s\n", name)
+		bytes, lines, words, chars, maxLineLength := processFile(name)
+		totalLines += lines
+		totalWords += words
+		totalChars += chars
+		totalBytes += bytes
+		totalMaxLineLengths = max(totalMaxLineLengths, maxLineLength)
 		fileCount++
 	}
 
+	displayTotals(fileCount, totalLines, totalWords, totalBytes, totalChars, totalMaxLineLengths)
+}
+
+func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) {
+	file, err := os.Open(name)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return
+	}
+	bytes = stat.Size()
+
+	if countLines || countWords || countChars || maxLengths {
+		reader := bufio.NewReader(file)
+		if countWords || countChars || maxLengths {
+			for {
+				text, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					panic(err)
+				}
+				prev := ' '
+				lineLength := int64(0)
+				for _, curr := range text {
+					if !unicode.IsSpace(curr) && unicode.IsSpace(prev) {
+						words++
+					}
+					prev = curr
+					if curr == '\t' {
+						// adjust for tab stops
+						lineLength = (lineLength + 8) / 8 * 8
+					} else if curr != '\n' && curr != '\r' {
+						lineLength++
+					}
+					chars++
+				}
+				lines++
+				maxLineLength = max(maxLineLength, lineLength)
+			}
+		} else {
+			// faster, just counting lines
+			for {
+				_, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					panic(err)
+				}
+				lines++
+			}
+		}
+	}
+
+	if countLines {
+		fmt.Printf("%6d ", lines)
+	}
+	if countWords {
+		fmt.Printf("%6d ", words)
+	}
+	if countChars {
+		fmt.Printf("%6d ", chars)
+	}
+	if countBytes {
+		fmt.Printf("%6d ", bytes)
+	}
+	if maxLengths {
+		fmt.Printf("%6d ", maxLineLength)
+	}
+	fmt.Printf("%s\n", name)
+	return
+}
+
+func displayTotals(fileCount, totalLines, totalWords, totalBytes, totalChars, totalMaxLineLengths int64) {
 	if fileCount > 1 {
 		if countLines {
 			fmt.Printf("%6d ", totalLines)
@@ -142,5 +149,4 @@ func main() {
 		}
 		fmt.Printf("total\n")
 	}
-
 }
