@@ -73,6 +73,40 @@ func processFilename(name string) (result counters) {
 }
 
 func processFile(name string, file *os.File) (result counters) {
+	var lineLength int64
+	var prev, curr rune
+	var bytesRead int
+	var err error
+
+	reader := bufio.NewReader(file)
+
+	prev = ' '
+	for {
+		curr, bytesRead, err = reader.ReadRune()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+		if !unicode.IsSpace(curr) && unicode.IsSpace(prev) {
+			result.words++
+		}
+		if curr == '\t' {
+			// adjust for tab stops
+			lineLength = (lineLength + 8) / 8 * 8
+		} else if curr == '\n' {
+			result.lines++
+			lineLength = 0
+		} else if curr != '\r' {
+			lineLength++
+		}
+		result.chars++
+		result.bytes += int64(bytesRead)
+		result.maxLineLength = max(result.maxLineLength, lineLength)
+		prev = curr
+	}
+
 	if file != os.Stdin {
 		stat, err := file.Stat()
 		if err != nil {
@@ -80,54 +114,6 @@ func processFile(name string, file *os.File) (result counters) {
 			return
 		}
 		result.bytes = stat.Size()
-	}
-
-	if file == os.Stdin || countLines || countWords || countChars || maxLengths {
-		reader := bufio.NewReader(file)
-		if file == os.Stdin {
-			result.bytes = 0
-		}
-		if countWords || countChars || maxLengths {
-			for {
-				text, err := reader.ReadString('\n')
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					panic(err)
-				}
-				prev := ' '
-				lineLength := int64(0)
-				for _, curr := range text {
-					if !unicode.IsSpace(curr) && unicode.IsSpace(prev) {
-						result.words++
-					}
-					prev = curr
-					if curr == '\t' {
-						// adjust for tab stops
-						lineLength = (lineLength + 8) / 8 * 8
-					} else if curr != '\n' && curr != '\r' {
-						lineLength++
-					}
-					result.chars++
-				}
-				result.lines++
-				result.bytes += int64(len(text))
-				result.maxLineLength = max(result.maxLineLength, lineLength)
-			}
-		} else {
-			// faster, just counting lines
-			for {
-				_, err := reader.ReadString('\n')
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					panic(err)
-				}
-				result.lines++
-			}
-		}
 	}
 
 	if countLines {
@@ -157,11 +143,11 @@ func displayTotals(fileCount int64, total counters) {
 		if countWords {
 			fmt.Printf("%7d ", total.words)
 		}
-		if countBytes {
-			fmt.Printf("%7d ", total.bytes)
-		}
 		if countChars {
 			fmt.Printf("%7d ", total.chars)
+		}
+		if countBytes {
+			fmt.Printf("%7d ", total.bytes)
 		}
 		if maxLengths {
 			fmt.Printf("%7d ", total.maxLineLength)
