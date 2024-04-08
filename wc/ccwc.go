@@ -45,7 +45,12 @@ func main() {
 	var total counters
 
 	for _, name := range flag.Args() {
-		result := processFilename(name)
+		var result counters
+		if name == "-" {
+			result = processFile("", os.Stdin)
+		} else {
+			result = processFilename(name)
+		}
 		total.lines += result.lines
 		total.words += result.words
 		total.chars += result.chars
