@@ -26,6 +26,10 @@ func init() {
 	flag.BoolVar(&countWords, "words", false, "print the word counts")
 }
 
+type counters struct {
+	bytes, lines, words, chars, maxLineLength int64
+}
+
 func main() {
 	flag.Parse()
 
@@ -37,22 +41,23 @@ func main() {
 		countBytes, countLines, countWords = true, true, true
 	}
 
-	var fileCount, totalBytes, totalLines, totalWords, totalChars, totalMaxLineLengths int64
+	var fileCount int64
+	var total counters
 
 	for _, name := range flag.Args() {
-		bytes, lines, words, chars, maxLineLength := processFile(name)
-		totalLines += lines
-		totalWords += words
-		totalChars += chars
-		totalBytes += bytes
-		totalMaxLineLengths = max(totalMaxLineLengths, maxLineLength)
+		result := processFile(name)
+		total.lines += result.lines
+		total.words += result.words
+		total.chars += result.chars
+		total.bytes += result.bytes
+		total.maxLineLength = max(total.maxLineLength, result.maxLineLength)
 		fileCount++
 	}
 
-	displayTotals(fileCount, totalLines, totalWords, totalBytes, totalChars, totalMaxLineLengths)
+	displayTotals(fileCount, total)
 }
 
-func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) {
+func processFile(name string) (result counters) {
 	file, err := os.Open(name)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -65,7 +70,7 @@ func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) 
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
-	bytes = stat.Size()
+	result.bytes = stat.Size()
 
 	if countLines || countWords || countChars || maxLengths {
 		reader := bufio.NewReader(file)
@@ -82,7 +87,7 @@ func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) 
 				lineLength := int64(0)
 				for _, curr := range text {
 					if !unicode.IsSpace(curr) && unicode.IsSpace(prev) {
-						words++
+						result.words++
 					}
 					prev = curr
 					if curr == '\t' {
@@ -91,10 +96,10 @@ func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) 
 					} else if curr != '\n' && curr != '\r' {
 						lineLength++
 					}
-					chars++
+					result.chars++
 				}
-				lines++
-				maxLineLength = max(maxLineLength, lineLength)
+				result.lines++
+				result.maxLineLength = max(result.maxLineLength, lineLength)
 			}
 		} else {
 			// faster, just counting lines
@@ -106,46 +111,46 @@ func processFile(name string) (bytes, lines, words, chars, maxLineLength int64) 
 					}
 					panic(err)
 				}
-				lines++
+				result.lines++
 			}
 		}
 	}
 
 	if countLines {
-		fmt.Printf("%6d ", lines)
+		fmt.Printf("%6d ", result.lines)
 	}
 	if countWords {
-		fmt.Printf("%6d ", words)
+		fmt.Printf("%6d ", result.words)
 	}
 	if countChars {
-		fmt.Printf("%6d ", chars)
+		fmt.Printf("%6d ", result.chars)
 	}
 	if countBytes {
-		fmt.Printf("%6d ", bytes)
+		fmt.Printf("%6d ", result.bytes)
 	}
 	if maxLengths {
-		fmt.Printf("%6d ", maxLineLength)
+		fmt.Printf("%6d ", result.maxLineLength)
 	}
 	fmt.Printf("%s\n", name)
 	return
 }
 
-func displayTotals(fileCount, totalLines, totalWords, totalBytes, totalChars, totalMaxLineLengths int64) {
+func displayTotals(fileCount int64, total counters) {
 	if fileCount > 1 {
 		if countLines {
-			fmt.Printf("%6d ", totalLines)
+			fmt.Printf("%6d ", total.lines)
 		}
 		if countWords {
-			fmt.Printf("%6d ", totalWords)
+			fmt.Printf("%6d ", total.words)
 		}
 		if countBytes {
-			fmt.Printf("%6d ", totalBytes)
+			fmt.Printf("%6d ", total.bytes)
 		}
 		if countChars {
-			fmt.Printf("%6d ", totalChars)
+			fmt.Printf("%6d ", total.chars)
 		}
 		if maxLengths {
-			fmt.Printf("%6d ", totalMaxLineLengths)
+			fmt.Printf("%6d ", total.maxLineLength)
 		}
 		fmt.Printf("total\n")
 	}
