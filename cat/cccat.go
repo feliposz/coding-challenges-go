@@ -2,18 +2,32 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
-func main() {
+var printLineNumbers, printNonBlankLineNumbers bool
 
-	names := os.Args[1:]
+func init() {
+	flag.BoolVar(&printLineNumbers, "n", false, "number all output lines")
+	flag.BoolVar(&printLineNumbers, "number", false, "number all output lines")
+	flag.BoolVar(&printNonBlankLineNumbers, "b", false, "number nonempty output lines, overrides -n")
+	flag.BoolVar(&printNonBlankLineNumbers, "number-nonblank", false, "number nonempty output lines, overrides -n")
+}
+
+func main() {
+	flag.Parse()
+
+	names := flag.Args()
 
 	if len(names) == 0 {
 		names = append(names, "-")
 	}
+
+	lineNumber := 0
 
 	for _, name := range names {
 		var file *os.File
@@ -30,6 +44,7 @@ func main() {
 		}
 
 		reader := bufio.NewReader(file)
+
 		for {
 			text, err := reader.ReadString('\n')
 			if err != nil {
@@ -37,6 +52,15 @@ func main() {
 					break
 				}
 				panic(err)
+			}
+			if printNonBlankLineNumbers {
+				if len(strings.TrimRight(text, "\r\n")) > 0 {
+					lineNumber++
+					fmt.Printf("%6d\t", lineNumber)
+				}
+			} else if printLineNumbers {
+				lineNumber++
+				fmt.Printf("%6d\t", lineNumber)
 			}
 			fmt.Print(text)
 		}
