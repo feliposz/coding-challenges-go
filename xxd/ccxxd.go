@@ -149,7 +149,7 @@ func dump(infile, outfile *os.File) {
 			for i := 0; i < octestPerLine; i++ {
 				if i >= bytesRead {
 					fmt.Fprintf(outfile, " ")
-				} else if buffer[i] < 32 || buffer[i] > 127 {
+				} else if buffer[i] < 32 || buffer[i] >= 127 {
 					fmt.Fprintf(outfile, ".")
 				} else {
 					fmt.Fprintf(outfile, "%c", buffer[i])
