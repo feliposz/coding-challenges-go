@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -8,11 +10,10 @@ import (
 	"os"
 )
 
-func main() {
+var octestPerLine, grouping, length, seekOffset int
+var displayHelp, littleEndian, decimalOffset, plainHexDump, reverseOp bool
 
-	var octestPerLine, grouping, length, seekOffset int
-	var displayHelp, littleEndian, decimalOffset, plainHexDump bool
-
+func init() {
 	flag.IntVar(&octestPerLine, "c", 16, "format <cols> octets per line.")
 	flag.IntVar(&grouping, "g", 2, "number of octets per group in normal output.")
 	flag.IntVar(&length, "l", math.MaxInt, "stop after <len> octets.")
@@ -21,6 +22,10 @@ func main() {
 	flag.BoolVar(&littleEndian, "e", false, "little-endian dump.")
 	flag.BoolVar(&decimalOffset, "d", false, "show offset in decimal instead of hex.")
 	flag.BoolVar(&plainHexDump, "p", false, "output in postscript plain hexdump style.")
+	flag.BoolVar(&reverseOp, "r", false, "reverse operation: convert (or patch) hexdump into binary.")
+}
+
+func main() {
 	flag.Parse()
 
 	if octestPerLine < 1 || octestPerLine > 256 {
@@ -63,7 +68,11 @@ func main() {
 	}
 
 	if flag.NArg() == 2 {
-		outfile, err = os.Create(flag.Arg(1))
+		if reverseOp {
+			outfile, err = os.OpenFile(flag.Arg(1), os.O_RDWR|os.O_CREATE, 0644)
+		} else {
+			outfile, err = os.Create(flag.Arg(1))
+		}
 		if err != nil && !os.IsExist(err) {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(2)
@@ -71,11 +80,19 @@ func main() {
 		defer outfile.Close()
 	}
 
+	if reverseOp {
+		reverseDump(infile, outfile)
+	} else {
+		dump(infile, outfile)
+	}
+}
+
+func dump(infile, outfile *os.File) {
 	offset := 0
 
 	if seekOffset > 0 {
 		offset = seekOffset
-		_, err = infile.Seek(int64(seekOffset), io.SeekStart)
+		_, err := infile.Seek(int64(seekOffset), io.SeekStart)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(2)
@@ -143,5 +160,22 @@ func main() {
 
 		offset += octestPerLine
 		bytesWritten += octestPerLine
+	}
+}
+
+func reverseDump(infile, outfile *os.File) {
+	if plainHexDump {
+		scanner := bufio.NewScanner(infile)
+		for scanner.Scan() {
+			text := scanner.Text()
+			data, err := hex.DecodeString(text)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(2)
+			}
+			outfile.Write(data)
+		}
+	} else {
+		panic("not implemented")
 	}
 }
