@@ -36,27 +36,41 @@ func main() {
 		displayHelp = true
 	}
 
+	if flag.NArg() > 2 {
+		fmt.Fprintf(os.Stderr, "expecting input and output filenames only\n")
+		displayHelp = true
+	}
+
 	if displayHelp || !flag.Parsed() {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	var file *os.File
+	var infile, outfile *os.File
 	var err error
 
-	if flag.NArg() > 0 {
-		file, err = os.Open(flag.Arg(0))
+	infile, outfile = os.Stdin, os.Stdout
+
+	if flag.NArg() >= 1 {
+		infile, err = os.Open(flag.Arg(0))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(2)
 		}
-		defer file.Close()
-	} else {
-		file = os.Stdin
+		defer infile.Close()
+	}
+
+	if flag.NArg() == 2 {
+		outfile, err = os.Create(flag.Arg(1))
+		if err != nil && !os.IsExist(err) {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(2)
+		}
+		defer outfile.Close()
 	}
 
 	offset := seekOffset
-	_, err = file.Seek(int64(seekOffset), io.SeekStart)
+	_, err = infile.Seek(int64(seekOffset), io.SeekStart)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(2)
@@ -65,7 +79,7 @@ func main() {
 	buffer := make([]byte, octestPerLine)
 	bytesWritten := 0
 	for bytesWritten < length {
-		bytesRead, err := file.Read(buffer)
+		bytesRead, err := infile.Read(buffer)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -76,35 +90,35 @@ func main() {
 		bytesLeft := length - bytesWritten
 		bytesRead = min(bytesRead, bytesLeft)
 
-		fmt.Printf("%08x:", offset)
+		fmt.Fprintf(outfile, "%08x:", offset)
 
 		for i := 0; i < octestPerLine; i++ {
 			if i%grouping == 0 {
-				fmt.Print(" ")
+				fmt.Fprintf(outfile, " ")
 			}
 			if i >= bytesRead {
-				fmt.Print("  ")
+				fmt.Fprintf(outfile, "  ")
 			} else if littleEndian {
 				j := (i/grouping)*grouping + grouping - i%grouping - 1
-				fmt.Printf("%02x", buffer[j])
+				fmt.Fprintf(outfile, "%02x", buffer[j])
 			} else {
-				fmt.Printf("%02x", buffer[i])
+				fmt.Fprintf(outfile, "%02x", buffer[i])
 			}
 		}
 
-		fmt.Print("  ")
+		fmt.Fprintf(outfile, "  ")
 
 		for i := 0; i < octestPerLine; i++ {
 			if i >= bytesRead {
-				fmt.Print(" ")
+				fmt.Fprintf(outfile, " ")
 			} else if buffer[i] < 32 || buffer[i] > 127 {
-				fmt.Print(".")
+				fmt.Fprintf(outfile, ".")
 			} else {
-				fmt.Printf("%c", buffer[i])
+				fmt.Fprintf(outfile, "%c", buffer[i])
 			}
 		}
 
-		fmt.Print("\n")
+		fmt.Fprintf(outfile, "\n")
 
 		offset += octestPerLine
 		bytesWritten += octestPerLine
