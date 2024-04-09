@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strconv"
 )
 
 var octestPerLine, grouping, length, seekOffset int
@@ -176,6 +177,82 @@ func reverseDump(infile, outfile *os.File) {
 			outfile.Write(data)
 		}
 	} else {
-		panic("not implemented")
+		reader := bufio.NewReader(infile)
+		base := 16
+		if decimalOffset {
+			base = 10
+		}
+		for {
+			offsetStr, err := reader.ReadString(':')
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(2)
+			}
+
+			offsetStr = offsetStr[:len(offsetStr)-1]
+			offset, err := strconv.ParseInt(offsetStr, base, 64)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(2)
+			}
+
+			dataStr, err := reader.ReadString('\n')
+			if err != nil && err != io.EOF {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(2)
+			}
+
+			data := make([]byte, 0)
+			for i := 0; i < len(dataStr)-1; i++ {
+				if isSpace(dataStr[i]) && isSpace(dataStr[i+1]) {
+					break
+				} else if isSpace(dataStr[i]) {
+					continue
+				} else if isHexDigit(dataStr[i]) && isHexDigit(dataStr[i+1]) {
+					data = append(data, decodeHexDigit(dataStr[i])*16+decodeHexDigit(dataStr[i+1]))
+					i++
+				}
+			}
+
+			if len(data) > 0 {
+				outfile.Seek(offset, io.SeekStart)
+				outfile.Write(data)
+			}
+		}
 	}
+}
+
+func isSpace(c byte) bool {
+	switch c {
+	case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xA0:
+		return true
+	}
+	return false
+}
+
+func isHexDigit(c byte) bool {
+	switch {
+	case c >= '0' && c <= '9':
+		return true
+	case c >= 'a' && c <= 'f':
+		return true
+	case c >= 'A' && c <= 'F':
+		return true
+	}
+	return false
+}
+
+func decodeHexDigit(c byte) byte {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0'
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10
+	}
+	panic("invalid hex digit")
 }
