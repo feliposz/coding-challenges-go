@@ -11,7 +11,7 @@ import (
 func main() {
 
 	var octestPerLine, grouping, length, seekOffset int
-	var displayHelp, littleEndian bool
+	var displayHelp, littleEndian, decimalOffset, plainHexDump bool
 
 	flag.IntVar(&octestPerLine, "c", 16, "format <cols> octets per line.")
 	flag.IntVar(&grouping, "g", 2, "number of octets per group in normal output.")
@@ -19,6 +19,8 @@ func main() {
 	flag.IntVar(&seekOffset, "s", 0, "start at <seek> bytes absolute.")
 	flag.BoolVar(&displayHelp, "h", false, "print this summary.")
 	flag.BoolVar(&littleEndian, "e", false, "little-endian dump.")
+	flag.BoolVar(&decimalOffset, "d", false, "show offset in decimal instead of hex.")
+	flag.BoolVar(&plainHexDump, "p", false, "output in postscript plain hexdump style.")
 	flag.Parse()
 
 	if octestPerLine < 1 || octestPerLine > 256 {
@@ -69,11 +71,19 @@ func main() {
 		defer outfile.Close()
 	}
 
-	offset := seekOffset
-	_, err = infile.Seek(int64(seekOffset), io.SeekStart)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(2)
+	offset := 0
+
+	if seekOffset > 0 {
+		offset = seekOffset
+		_, err = infile.Seek(int64(seekOffset), io.SeekStart)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(2)
+		}
+	}
+
+	if plainHexDump {
+		octestPerLine = 30
 	}
 
 	buffer := make([]byte, octestPerLine)
@@ -90,35 +100,46 @@ func main() {
 		bytesLeft := length - bytesWritten
 		bytesRead = min(bytesRead, bytesLeft)
 
-		fmt.Fprintf(outfile, "%08x:", offset)
+		if plainHexDump {
 
-		for i := 0; i < octestPerLine; i++ {
-			if i%grouping == 0 {
-				fmt.Fprintf(outfile, " ")
-			}
-			if i >= bytesRead {
-				fmt.Fprintf(outfile, "  ")
-			} else if littleEndian {
-				j := (i/grouping)*grouping + grouping - i%grouping - 1
-				fmt.Fprintf(outfile, "%02x", buffer[j])
+			fmt.Fprintf(outfile, "%x\n", buffer[:bytesRead])
+
+		} else {
+
+			if decimalOffset {
+				fmt.Fprintf(outfile, "%08d:", offset)
 			} else {
-				fmt.Fprintf(outfile, "%02x", buffer[i])
+				fmt.Fprintf(outfile, "%08x:", offset)
 			}
-		}
 
-		fmt.Fprintf(outfile, "  ")
-
-		for i := 0; i < octestPerLine; i++ {
-			if i >= bytesRead {
-				fmt.Fprintf(outfile, " ")
-			} else if buffer[i] < 32 || buffer[i] > 127 {
-				fmt.Fprintf(outfile, ".")
-			} else {
-				fmt.Fprintf(outfile, "%c", buffer[i])
+			for i := 0; i < octestPerLine; i++ {
+				if i%grouping == 0 {
+					fmt.Fprintf(outfile, " ")
+				}
+				if i >= bytesRead {
+					fmt.Fprintf(outfile, "  ")
+				} else if littleEndian {
+					j := (i/grouping)*grouping + grouping - i%grouping - 1
+					fmt.Fprintf(outfile, "%02x", buffer[j])
+				} else {
+					fmt.Fprintf(outfile, "%02x", buffer[i])
+				}
 			}
-		}
 
-		fmt.Fprintf(outfile, "\n")
+			fmt.Fprintf(outfile, "  ")
+
+			for i := 0; i < octestPerLine; i++ {
+				if i >= bytesRead {
+					fmt.Fprintf(outfile, " ")
+				} else if buffer[i] < 32 || buffer[i] > 127 {
+					fmt.Fprintf(outfile, ".")
+				} else {
+					fmt.Fprintf(outfile, "%c", buffer[i])
+				}
+			}
+
+			fmt.Fprintf(outfile, "\n")
+		}
 
 		offset += octestPerLine
 		bytesWritten += octestPerLine
