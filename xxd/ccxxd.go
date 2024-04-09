@@ -100,6 +100,9 @@ func dump(infile, outfile *os.File) {
 		}
 	}
 
+	reader := bufio.NewReaderSize(infile, 1024*1024)
+	writer := bufio.NewWriterSize(outfile, 1024*1024)
+
 	if plainHexDump {
 		octestPerLine = 30
 	}
@@ -107,20 +110,21 @@ func dump(infile, outfile *os.File) {
 	buffer := make([]byte, octestPerLine)
 	bytesWritten := 0
 	for bytesWritten < length {
-		bytesRead, err := infile.Read(buffer)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
+		bytesRead, err := reader.Read(buffer)
+		if err != nil && err != io.EOF {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(2)
 		}
 		bytesLeft := length - bytesWritten
 		bytesRead = min(bytesRead, bytesLeft)
 
+		if bytesRead == 0 {
+			break
+		}
+
 		if plainHexDump {
 
-			fmt.Fprintf(outfile, "%x\n", buffer[:bytesRead])
+			fmt.Fprintf(writer, "%x\n", buffer[:bytesRead])
 
 		} else {
 
@@ -132,36 +136,38 @@ func dump(infile, outfile *os.File) {
 
 			for i := 0; i < octestPerLine; i++ {
 				if i%grouping == 0 {
-					fmt.Fprintf(outfile, " ")
+					fmt.Fprintf(writer, " ")
 				}
 				if i >= bytesRead {
-					fmt.Fprintf(outfile, "  ")
+					fmt.Fprintf(writer, "  ")
 				} else if littleEndian {
 					j := (i/grouping)*grouping + grouping - i%grouping - 1
-					fmt.Fprintf(outfile, "%02x", buffer[j])
+					fmt.Fprintf(writer, "%02x", buffer[j])
 				} else {
-					fmt.Fprintf(outfile, "%02x", buffer[i])
+					fmt.Fprintf(writer, "%02x", buffer[i])
 				}
 			}
 
-			fmt.Fprintf(outfile, "  ")
+			fmt.Fprintf(writer, "  ")
 
 			for i := 0; i < octestPerLine; i++ {
 				if i >= bytesRead {
-					fmt.Fprintf(outfile, " ")
+					fmt.Fprintf(writer, " ")
 				} else if buffer[i] < 32 || buffer[i] >= 127 {
-					fmt.Fprintf(outfile, ".")
+					fmt.Fprintf(writer, ".")
 				} else {
-					fmt.Fprintf(outfile, "%c", buffer[i])
+					fmt.Fprintf(writer, "%c", buffer[i])
 				}
 			}
 
-			fmt.Fprintf(outfile, "\n")
+			fmt.Fprintf(writer, "\n")
 		}
 
-		offset += octestPerLine
-		bytesWritten += octestPerLine
+		offset += bytesRead
+		bytesWritten += bytesRead
 	}
+
+	writer.Flush()
 }
 
 func reverseDump(infile, outfile *os.File) {
@@ -177,19 +183,20 @@ func reverseDump(infile, outfile *os.File) {
 			outfile.Write(data)
 		}
 	} else {
-		reader := bufio.NewReader(infile)
+		reader := bufio.NewReaderSize(infile, 1024*1024)
 		base := 16
 		if decimalOffset {
 			base = 10
 		}
 		for {
 			offsetStr, err := reader.ReadString(':')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
+			if err != nil && err != io.EOF {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(2)
+			}
+
+			if len(offsetStr) == 0 {
+				break
 			}
 
 			offsetStr = offsetStr[:len(offsetStr)-1]
