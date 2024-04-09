@@ -11,13 +11,14 @@ import (
 func main() {
 
 	var octestPerLine, grouping, length, seekOffset int
-	var displayHelp bool
+	var displayHelp, littleEndian bool
 
 	flag.IntVar(&octestPerLine, "c", 16, "format <cols> octets per line.")
 	flag.IntVar(&grouping, "g", 2, "number of octets per group in normal output.")
 	flag.IntVar(&length, "l", math.MaxInt, "stop after <len> octets.")
 	flag.IntVar(&seekOffset, "s", 0, "start at <seek> bytes absolute.")
 	flag.BoolVar(&displayHelp, "h", false, "print this summary.")
+	flag.BoolVar(&littleEndian, "e", false, "little-endian dump.")
 	flag.Parse()
 
 	if octestPerLine < 1 || octestPerLine > 256 {
@@ -83,6 +84,9 @@ func main() {
 			}
 			if i >= bytesRead {
 				fmt.Print("  ")
+			} else if littleEndian {
+				j := (i/grouping)*grouping + grouping - i%grouping - 1
+				fmt.Printf("%02x", buffer[j])
 			} else {
 				fmt.Printf("%02x", buffer[i])
 			}
