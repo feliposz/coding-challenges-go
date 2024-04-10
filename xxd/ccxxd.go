@@ -129,9 +129,9 @@ func dump(infile, outfile *os.File) {
 		} else {
 
 			if decimalOffset {
-				fmt.Fprintf(outfile, "%08d:", offset)
+				fmt.Fprintf(writer, "%08d:", offset)
 			} else {
-				fmt.Fprintf(outfile, "%08x:", offset)
+				fmt.Fprintf(writer, "%08x:", offset)
 			}
 
 			for i := 0; i < octestPerLine; i++ {

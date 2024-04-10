@@ -2,6 +2,8 @@
 
 My solutions written in Go for the [Coding Challenges](https://codingchallenges.fyi/), as proposed by [John Cricket](https://github.com/JohnCrickett).
 
+*Note: Some solutions have their own repository. Please, check the links below.*
+
 ## The challenges
 
 - [x] #0 [Coding Challenges - Intro](https://codingchallenges.fyi/challenges/intro)
@@ -12,10 +14,10 @@ My solutions written in Go for the [Coding Challenges](https://codingchallenges.
 - [ ] #5 [Build You Own Load Balancer](https://codingchallenges.fyi/challenges/challenge-load-balancer)
 - [ ] #6 [Build Your Own Sort Tool](https://codingchallenges.fyi/challenges/challenge-sort)
 - [ ] #7 [Build Your Own Calculator](https://codingchallenges.fyi/challenges/challenge-calculator)
-- [ ] #8 [Build Your Own Redis Server](https://codingchallenges.fyi/challenges/challenge-redis)
+- [x] #8 [Build Your Own Redis Server](https://codingchallenges.fyi/challenges/challenge-redis) (Repo: [codecrafters-redis-go](https://github.com/feliposz/codecrafters-redis-go))
 - [ ] #9 [Build Your Own grep](https://codingchallenges.fyi/challenges/challenge-grep)
 - [ ] #10 [Build Your Own uniq Tool](https://codingchallenges.fyi/challenges/challenge-uniq)
-- [ ] #11 [Build Your Own Web Server](https://codingchallenges.fyi/challenges/challenge-webserver)
+- [x] #11 [Build Your Own Web Server](https://codingchallenges.fyi/challenges/challenge-webserver) (Repo: [codecrafters-http-server-go](https://github.com/feliposz/codecrafters-http-server-go/))
 - [ ] #12 [Build Your Own URL Shortener](https://codingchallenges.fyi/challenges/challenge-url-shortener)
 - [ ] #13 [Build Your Own diff Tool](https://codingchallenges.fyi/challenges/challenge-diff)
 - [ ] #14 [Build Your Own Shell](https://codingchallenges.fyi/challenges/challenge-shell)
@@ -30,11 +32,11 @@ My solutions written in Go for the [Coding Challenges](https://codingchallenges.
 - [ ] #23 [Build Your Own Traceroute](https://codingchallenges.fyi/challenges/challenge-traceroute)
 - [ ] #24 [Build Your Own Realtime Chat Client and Server](https://codingchallenges.fyi/challenges/challenge-realtime-chat)
 - [ ] #25 [Build Your Own NATS Message Broker](https://codingchallenges.fyi/challenges/challenge-nats)
-- [ ] #26 [Build Your Own Git](https://codingchallenges.fyi/challenges/challenge-git)
+- [x] #26 [Build Your Own Git](https://codingchallenges.fyi/challenges/challenge-git) (Repo: [build-your-own-git](https://github.com/feliposz/build-your-own-git/))
 - [ ] #27 [Build Your Own Rate Limiter](https://codingchallenges.fyi/challenges/challenge-rate-limiter)
 - [ ] #28 [Build Your Own NTP Client](https://codingchallenges.fyi/challenges/challenge-ntp)
 - [ ] #29 [Build Your Own Scheduling Automation App](https://codingchallenges.fyi/challenges/challenge-scheduler)
-- [ ] #30 [Build Your Own Lisp Interpreter](https://codingchallenges.fyi/challenges/challenge-lisp)
+- [x] #30 [Build Your Own Lisp Interpreter](https://codingchallenges.fyi/challenges/challenge-lisp) (Repo: [felispy](https://github.com/feliposz/felispy) - written in C, not Go)
 - [ ] #31 [Build Your Own QR Code Generator](https://codingchallenges.fyi/challenges/challenge-qr-generator)
 - [ ] #32 [Build Your Own Crontab Tool](https://codingchallenges.fyi/challenges/challenge-cron)
 - [ ] #33 [Build Your Own head](https://codingchallenges.fyi/challenges/challenge-head)

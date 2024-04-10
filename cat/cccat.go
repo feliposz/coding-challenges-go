@@ -70,7 +70,7 @@ func main() {
 			defer file.Close()
 		}
 
-		reader := bufio.NewReader(file)
+		reader := bufio.NewReaderSize(file, 1024*1024)
 
 		for {
 			text, err := reader.ReadBytes('\n')
@@ -94,14 +94,14 @@ func main() {
 				for _, c := range text {
 					if showEnds && c == '\n' {
 						fmt.Print("$\n")
-					} else if showEnds && c == '\r' {
-						fmt.Print("^M")
 					} else if showTabs && c == '\t' {
 						fmt.Print("^I")
 					} else if showNonPrint && (c < 32 || c >= 127) {
 						switch {
 						case c == 0:
 							fmt.Print("^@")
+						case c == '\n':
+							fmt.Print("\n")
 						case c < 32:
 							fmt.Printf("^%c", c-1+'A')
 						case c == 127:

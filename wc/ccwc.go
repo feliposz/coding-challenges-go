@@ -83,7 +83,7 @@ func processFile(name string, file *os.File) (result counters) {
 	var bytesRead int
 	var err error
 
-	reader := bufio.NewReader(file)
+	reader := bufio.NewReaderSize(file, 1024*1024)
 
 	prev = ' '
 	for {
