@@ -87,15 +87,15 @@ func tokenize(data []byte) (tokens []*Token, err error) {
 					return nil, ErrNumber
 				} else if data[j] == '.' {
 					dot = true
-				} else if exponent && data[j] == 'e' || data[j] == 'E' {
+				} else if exponent && (data[j] == 'e' || data[j] == 'E') {
 					return nil, ErrNumber
 				} else if data[j] == 'e' || data[j] == 'E' {
 					exponent = true
-				} else if !exponent && data[j] == '+' || data[j] == '-' {
+				} else if !exponent && (data[j] == '+' || data[j] == '-') {
 					return nil, ErrNumber
-				} else if expSign && data[j] == '+' || data[j] == '-' {
+				} else if expSign && (data[j] == '+' || data[j] == '-') {
 					return nil, ErrNumber
-				} else if data[j] == '+' || data[j] == '-' {
+				} else if exponent && (data[j] == '+' || data[j] == '-') {
 					expSign = true
 				} else if data[j] < '0' || data[j] > '9' {
 					break
