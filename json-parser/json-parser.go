@@ -2,24 +2,53 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
-	"slices"
 	"strconv"
 )
 
+var payloadOnly bool
+var depth, maxDepth int
+
 func main() {
-	data, err := io.ReadAll(os.Stdin)
+
+	flag.BoolVar(&payloadOnly, "payload-only", false, "Check if type is object or array")
+	flag.IntVar(&maxDepth, "max-depth", math.MaxInt, "Max nesting depth of objects")
+	flag.Parse()
+
+	if !flag.Parsed() {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	var file *os.File
+	var err error
+
+	if flag.NArg() == 0 {
+		file = os.Stdin
+	} else if flag.NArg() == 1 {
+		file, err = os.Open(flag.Arg(0))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	data, err := io.ReadAll(file)
 	if err != nil {
 		panic(err)
 	}
 
-	result, err := parse(data)
+	result, err := parse(string(data))
 	switch err {
 	case nil:
 		fmt.Printf("%#v\n", result)
-	case ErrArray, ErrKeyWord, ErrObject, ErrString, ErrNumber, ErrToken, ErrEmpty:
+	case ErrArray, ErrKeyWord, ErrObject, ErrString, ErrNumber, ErrToken, ErrEmpty, ErrPayload:
 		fmt.Println(err)
 		os.Exit(1)
 	default:
@@ -33,93 +62,120 @@ type Token struct {
 	Content string
 }
 
-var ErrEmpty = errors.New("invalid keyword")
+var ErrEmpty = errors.New("no data")
 var ErrKeyWord = errors.New("invalid keyword")
 var ErrString = errors.New("invalid string")
 var ErrNumber = errors.New("invalid number")
 var ErrToken = errors.New("invalid token")
 var ErrArray = errors.New("invalid array")
 var ErrObject = errors.New("invalid object")
+var ErrPayload = errors.New("invalid payload")
+var ErrMaxDepth = errors.New("max depth reached")
 
-func tokenize(data []byte) (tokens []*Token, err error) {
-	for i := 0; i < len(data); i++ {
-		if isSpace(data[i]) {
-			continue
-		}
-		token := new(Token)
-		switch data[i] {
-		case 'n', 't', 'f':
-			if i+4 <= len(data) && slices.Compare(data[i:i+4], []byte("null")) == 0 {
-				token.Type = 'n'
-				i += 3
-			} else if i+4 <= len(data) && slices.Compare(data[i:i+4], []byte("true")) == 0 {
-				token.Type = 't'
-				i += 3
-			} else if i+5 <= len(data) && slices.Compare(data[i:i+5], []byte("false")) == 0 {
-				token.Type = 'f'
-				i += 4
-			} else {
-				return nil, ErrKeyWord
-			}
-		case '{', '}', '[', ']', ',', ':':
-			token.Type = data[i]
-		case '"':
-			token.Type = 'S' // string
-			j := i + 1
-			for j < len(data) && data[j] != '"' {
-				if data[j] == '\\' && j < len(data)-1 && data[j+1] == '"' {
-					j++ // skip escaped quote
+func tokenize(data string) (tokens []*Token, err error) {
+	var tokenType byte
+	content := []rune{}
+	for i, c := range data {
+
+		retry := true
+		for retry {
+			retry = false
+			switch tokenType {
+			case 0:
+
+				if isSpace(byte(c)) {
+					continue
 				}
-				j++
-				// TODO: handle escaping properly
-			}
-			if data[j] != '"' {
-				return nil, ErrString
-			}
-			token.Content = string(data[i+1 : j])
-			i = j
-		case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.':
-			token.Type = '0' // number
-			j := i + 1
-			dot, exponent, expSign := false, false, false
-			for j < len(data) {
-				if dot && data[j] == '.' {
-					return nil, ErrNumber
-				} else if data[j] == '.' {
-					dot = true
-				} else if exponent && (data[j] == 'e' || data[j] == 'E') {
-					return nil, ErrNumber
-				} else if data[j] == 'e' || data[j] == 'E' {
-					exponent = true
-				} else if !exponent && (data[j] == '+' || data[j] == '-') {
-					return nil, ErrNumber
-				} else if expSign && (data[j] == '+' || data[j] == '-') {
-					return nil, ErrNumber
-				} else if exponent && (data[j] == '+' || data[j] == '-') {
-					expSign = true
-				} else if data[j] < '0' || data[j] > '9' {
-					break
+
+				switch c {
+				case '"':
+					tokenType = 'S'
+				case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+					content = append(content, c)
+					tokenType = '0'
+				case '[', ']', '{', '}', ',', ':':
+					tokens = append(tokens, &Token{byte(c), 0, ""})
+				default:
+					content = append(content, c)
+					tokenType = '*'
 				}
-				j++
+
+			case 'S':
+				switch c {
+				case '"':
+					tokens = append(tokens, &Token{tokenType, 0, string(content)})
+					content = content[:0]
+					tokenType = 0
+
+					//TODO: handle escaping
+
+				default:
+					content = append(content, c)
+				}
+
+			case '0':
+				parseNumber := false
+				switch c {
+				case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'e', 'E', '.', '+':
+					content = append(content, c)
+				default:
+					parseNumber = true
+				}
+
+				if i == len(data)-1 {
+					parseNumber = true
+				}
+
+				if parseNumber {
+					value, err := strconv.ParseFloat(string(content), 64)
+					if err != nil {
+						return nil, ErrNumber
+					}
+					tokens = append(tokens, &Token{tokenType, value, ""})
+					content = content[:0]
+					tokenType = 0
+					retry = i < len(data)
+				}
+
+			case '*':
+				parseKeyword := false
+				if c >= 'a' && c <= 'z' {
+					content = append(content, c)
+				} else {
+					parseKeyword = true
+				}
+
+				if i == len(data)-1 {
+					parseKeyword = true
+				}
+
+				if parseKeyword {
+					switch string(content) {
+					case "null":
+						tokenType = 'n'
+					case "false":
+						tokenType = 'f'
+					case "true":
+						tokenType = 't'
+					default:
+						return nil, ErrKeyWord
+					}
+					tokens = append(tokens, &Token{tokenType, 0, ""})
+					content = content[:0]
+					tokenType = 0
+					retry = i < len(data)
+				}
 			}
-			token.Value, err = strconv.ParseFloat(string(data[i:j]), 64)
-			if err != nil {
-				return nil, err
-			}
-			i = j - 1
-		default:
-			return nil, ErrToken
 		}
-		tokens = append(tokens, token)
 	}
-	return
+	return tokens, nil
 }
 
 func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
-func parse(data []byte) (result interface{}, err error) {
+func parse(data string) (result interface{}, err error) {
 	tokens, err := tokenize(data)
 	if err != nil {
 		return
@@ -128,7 +184,20 @@ func parse(data []byte) (result interface{}, err error) {
 		return nil, ErrEmpty
 	}
 	//printTokens(tokens)
-	result, _, err = parseTokens(tokens, 0)
+	result, end, err := parseTokens(tokens, 0)
+	if end < len(tokens) {
+		return nil, ErrToken
+	}
+	if payloadOnly {
+		switch result.(type) {
+		case []interface{}:
+			// ok
+		case map[string]interface{}:
+			// ok
+		default:
+			return nil, ErrPayload
+		}
+	}
 	return
 }
 
@@ -146,6 +215,13 @@ func printTokens(tokens []*Token) {
 }
 
 func parseTokens(tokens []*Token, start int) (result interface{}, end int, err error) {
+	depth++
+	defer func() {
+		depth--
+	}()
+	if depth >= maxDepth {
+		return nil, 0, ErrMaxDepth
+	}
 	switch tokens[start].Type {
 	case '[':
 		return parseArray(tokens, start)
@@ -180,15 +256,14 @@ func parseArray(tokens []*Token, start int) (result interface{}, end int, err er
 			return nil, 0, err
 		}
 		arr = append(arr, value)
-		if tokens[i].Type == ',' {
+		if i < len(tokens) && tokens[i].Type == ',' {
 			i++
-			if tokens[i].Type == ']' {
+			if i < len(tokens) && tokens[i].Type == ']' {
 				return nil, 0, ErrArray
 			}
-			continue
 		}
 	}
-	if tokens[i].Type != ']' {
+	if i >= len(tokens) || tokens[i].Type != ']' {
 		return nil, 0, ErrArray
 	}
 	result = arr
@@ -226,7 +301,7 @@ func parseObject(tokens []*Token, start int) (result interface{}, end int, err e
 			}
 		}
 	}
-	if tokens[i].Type != '}' {
+	if i >= len(tokens) || tokens[i].Type != '}' {
 		return nil, 0, ErrObject
 	}
 	result = obj
