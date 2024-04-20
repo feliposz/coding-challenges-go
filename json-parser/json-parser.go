@@ -48,8 +48,8 @@ func main() {
 	switch err {
 	case nil:
 		fmt.Printf("%#v\n", result)
-	case ErrArray, ErrKeyWord, ErrObject, ErrString, ErrNumber, ErrToken, ErrEmpty, ErrPayload:
-		fmt.Println(err)
+	case ErrArray, ErrKeyWord, ErrObject, ErrString, ErrNumber, ErrToken, ErrEmpty, ErrPayload, ErrMaxDepth:
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	default:
 		panic(err)
@@ -74,6 +74,8 @@ var ErrMaxDepth = errors.New("max depth reached")
 
 func tokenize(data string) (tokens []*Token, err error) {
 	var tokenType byte
+	var escaping, unicode bool
+	unicodeDigits := []rune{}
 	content := []rune{}
 	for i, c := range data {
 
@@ -101,13 +103,64 @@ func tokenize(data string) (tokens []*Token, err error) {
 				}
 
 			case 'S':
+				if escaping {
+					if unicode {
+						unicodeDigits = append(unicodeDigits, c)
+						if len(unicodeDigits) == 4 {
+							value, err := strconv.ParseUint(string(unicodeDigits), 16, 32)
+							if err != nil {
+								fmt.Println("invalid unicode codepoint: ", err)
+								return nil, ErrString
+							}
+							content = append(content, rune(value))
+							unicode = false
+							escaping = false
+							unicodeDigits = unicodeDigits[:0]
+						}
+						continue
+					}
+					switch c {
+					case '"', '\\', '/':
+						content = append(content, c)
+						escaping = false
+						continue
+					case 'r':
+						content = append(content, '\r')
+						escaping = false
+						continue
+					case 'n':
+						content = append(content, '\n')
+						escaping = false
+						continue
+					case 'b':
+						content = append(content, '\b')
+						escaping = false
+						continue
+					case 't':
+						content = append(content, '\t')
+						escaping = false
+						continue
+					case 'f':
+						content = append(content, '\f')
+						escaping = false
+						continue
+					case 'u':
+						unicode = true
+					default:
+						return nil, ErrString
+					}
+				}
 				switch c {
 				case '"':
 					tokens = append(tokens, &Token{tokenType, 0, string(content)})
 					content = content[:0]
 					tokenType = 0
 
-					//TODO: handle escaping
+				case '\\':
+					escaping = true
+
+				case '\r', '\n', '\t', '\b':
+					return nil, ErrString
 
 				default:
 					content = append(content, c)
@@ -129,6 +182,10 @@ func tokenize(data string) (tokens []*Token, err error) {
 				if parseNumber {
 					value, err := strconv.ParseFloat(string(content), 64)
 					if err != nil {
+						return nil, ErrNumber
+					}
+					if (value <= -1 || value >= 1) && content[0] == '0' && content[1] != '.' {
+						// No leading zero
 						return nil, ErrNumber
 					}
 					tokens = append(tokens, &Token{tokenType, value, ""})
@@ -185,6 +242,9 @@ func parse(data string) (result interface{}, err error) {
 	}
 	//printTokens(tokens)
 	result, end, err := parseTokens(tokens, 0)
+	if err != nil {
+		return
+	}
 	if end < len(tokens) {
 		return nil, ErrToken
 	}
@@ -219,7 +279,7 @@ func parseTokens(tokens []*Token, start int) (result interface{}, end int, err e
 	defer func() {
 		depth--
 	}()
-	if depth >= maxDepth {
+	if depth > maxDepth {
 		return nil, 0, ErrMaxDepth
 	}
 	switch tokens[start].Type {
