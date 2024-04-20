@@ -7,8 +7,8 @@ My solutions written in Go for the [Coding Challenges](https://codingchallenges.
 ## The challenges
 
 - [x] #0 [Coding Challenges - Intro](https://codingchallenges.fyi/challenges/intro)
-- [X] #1 [Build Your Own wc Tool](https://codingchallenges.fyi/challenges/challenge-wc)
-- [ ] #2 [Build Your Own JSON Parser](https://codingchallenges.fyi/challenges/challenge-json-parser)
+- [x] #1 [Build Your Own wc Tool](https://codingchallenges.fyi/challenges/challenge-wc)
+- [x] #2 [Build Your Own JSON Parser](https://codingchallenges.fyi/challenges/challenge-json-parser)
 - [ ] #3 [Build Your Own Compression Tool](https://codingchallenges.fyi/challenges/challenge-huffman)
 - [ ] #4 [Build Your Own cut Tool](https://codingchallenges.fyi/challenges/challenge-cut)
 - [ ] #5 [Build You Own Load Balancer](https://codingchallenges.fyi/challenges/challenge-load-balancer)
@@ -58,7 +58,7 @@ My solutions written in Go for the [Coding Challenges](https://codingchallenges.
 - [ ] #49 [Build Your Own Password Cracker](https://codingchallenges.fyi/challenges/challenge-password-cracker)
 - [ ] #50 [Build Your Own Xargs](https://codingchallenges.fyi/challenges/challenge-xargs)
 - [ ] #51 [Build Your Own HTTP Forward Proxy Server](https://codingchallenges.fyi/challenges/challenge-forward-proxy)
-- [ ] #52 [Build Your Own Docker](https://codingchallenges.fyi/challenges/challenge-docker)
+- [x] #52 [Build Your Own Docker](https://codingchallenges.fyi/challenges/challenge-docker) (Repo: [build-your-own-docker-go](https://github.com/feliposz/build-your-own-docker-go))
 - [ ] #53 [Build Your Own Spell Checker Using A Bloom Filter](https://codingchallenges.fyi/challenges/challenge-bloom)
 - [ ] #54 [Build Your Own Tar](https://codingchallenges.fyi/challenges/challenge-tar)
 - [x] #55 [Build Your Own Xxd](https://codingchallenges.fyi/challenges/challenge-xxd)
