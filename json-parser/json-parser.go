@@ -84,12 +84,9 @@ func tokenize(data string) (tokens []*Token, err error) {
 			retry = false
 			switch tokenType {
 			case 0:
-
-				if isSpace(byte(c)) {
-					continue
-				}
-
 				switch c {
+				case ' ', '\t', '\n', '\r':
+					continue
 				case '"':
 					tokenType = 'S'
 				case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -146,10 +143,12 @@ func tokenize(data string) (tokens []*Token, err error) {
 						continue
 					case 'u':
 						unicode = true
+						continue
 					default:
 						return nil, ErrString
 					}
 				}
+
 				switch c {
 				case '"':
 					tokens = append(tokens, &Token{tokenType, 0, string(content)})
@@ -180,12 +179,12 @@ func tokenize(data string) (tokens []*Token, err error) {
 				}
 
 				if parseNumber {
-					value, err := strconv.ParseFloat(string(content), 64)
-					if err != nil {
+					if len(content) > 1 && content[0] == '0' && content[1] != '.' {
+						// No leading zero
 						return nil, ErrNumber
 					}
-					if (value <= -1 || value >= 1) && content[0] == '0' && content[1] != '.' {
-						// No leading zero
+					value, err := strconv.ParseFloat(string(content), 64)
+					if err != nil {
 						return nil, ErrNumber
 					}
 					tokens = append(tokens, &Token{tokenType, value, ""})
@@ -228,10 +227,6 @@ func tokenize(data string) (tokens []*Token, err error) {
 	return tokens, nil
 }
 
-func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
-}
-
 func parse(data string) (result interface{}, err error) {
 	tokens, err := tokenize(data)
 	if err != nil {
@@ -240,7 +235,6 @@ func parse(data string) (result interface{}, err error) {
 	if len(tokens) == 0 {
 		return nil, ErrEmpty
 	}
-	//printTokens(tokens)
 	result, end, err := parseTokens(tokens, 0)
 	if err != nil {
 		return
@@ -259,19 +253,6 @@ func parse(data string) (result interface{}, err error) {
 		}
 	}
 	return
-}
-
-func printTokens(tokens []*Token) {
-	for _, token := range tokens {
-		fmt.Printf("type=%c", token.Type)
-		switch token.Type {
-		case 'S':
-			fmt.Printf(" content=%q", token.Content)
-		case '0':
-			fmt.Printf(" value=%f", token.Value)
-		}
-		fmt.Println()
-	}
 }
 
 func parseTokens(tokens []*Token, start int) (result interface{}, end int, err error) {
