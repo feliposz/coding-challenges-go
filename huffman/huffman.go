@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/heap"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -9,18 +10,54 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "Usage: huffman <filename>")
+	var compressMode, decompressMode, showHelp bool
+
+	flag.BoolVar(&compressMode, "c", false, "compress filename to output")
+	flag.BoolVar(&decompressMode, "d", false, "decompress filename to output")
+	flag.BoolVar(&showHelp, "h", false, "display this help information")
+	flag.Parse()
+
+	if !flag.Parsed() {
+		fmt.Fprintln(os.Stderr, "Usage: huffman [-c|-d] <filename> <output>")
 		os.Exit(1)
 	}
 
-	file, err := os.Open(os.Args[1])
+	if showHelp {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if flag.NArg() != 2 {
+		fmt.Fprintln(os.Stderr, "Input and output files must be provided")
+		os.Exit(1)
+	}
+
+	if compressMode && decompressMode {
+		fmt.Fprintln(os.Stderr, "Can't apply both compress and decompress!")
+		os.Exit(1)
+	}
+
+	input, err := os.Open(flag.Arg(0))
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
+	defer input.Close()
 
-	data, err := io.ReadAll(file)
+	output, err := os.Create(flag.Arg(1))
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+
+	if compressMode {
+		compressFile(input, output)
+	} else {
+		panic("not implemented")
+	}
+}
+
+func compressFile(input *os.File, output *os.File) {
+	data, err := io.ReadAll(input)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +124,7 @@ func main() {
 			fmt.Printf("'%c' %d %v\n", toPrintable(byte(code)), code, prefix)
 		}
 
-		fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
+		// fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
 	}
 
 	originalSize := len(data)
@@ -99,19 +136,53 @@ func main() {
 	fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
 	fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
 
-	encoded := encodePrefixTable(&prefixCodeTable)
-	fmt.Println(len(encoded), encoded)
+	encodedTable := encodePrefixTable(&prefixCodeTable)
 
-	testDecodedTable := decodePrefixTable(encoded)
+	debugDecoding := false
+	if debugDecoding {
+		testDecodedTable := decodePrefixTable(encodedTable)
 
-	for i := range prefixCodeTable {
-		if slices.Compare(prefixCodeTable[i], testDecodedTable[i]) != 0 {
-			fmt.Println(i, prefixCodeTable[i], testDecodedTable[i])
-			panic("decoded prefix is different")
+		for i := range prefixCodeTable {
+			if slices.Compare(prefixCodeTable[i], testDecodedTable[i]) != 0 {
+				fmt.Println(i, prefixCodeTable[i], testDecodedTable[i])
+				panic("decoded prefix is different")
+			}
+		}
+
+		fmt.Println("Encoded and decoded tables match!")
+	}
+
+	encodedTableLength := len(encodedTable)
+	compressedData := make([]byte, 0, predictedCompressedSize)
+	outputByte := byte(0)
+	shift := 8
+	for i, code := range data {
+		for _, bit := range prefixCodeTable[code] {
+			shift--
+			outputByte |= byte(bit) << shift
+			if shift == 0 || i == len(data)-1 {
+				compressedData = append(compressedData, outputByte)
+				outputByte = 0
+				shift = 8
+			}
 		}
 	}
 
-	fmt.Println("Encoded and decoded tables match!")
+	output.Write([]byte("CCHF")) // header
+	output.Write(uint32ToBytes(uint32(len(data))))
+	output.Write(uint32ToBytes(uint32(len(compressedData))))
+	output.Write(uint32ToBytes(uint32(encodedTableLength)))
+	output.Write(encodedTable)
+	output.Write(compressedData)
+}
+
+func uint32ToBytes(x uint32) []byte {
+	return []byte{
+		byte(x & 0xFF),
+		byte((x >> 8) & 0xFF),
+		byte((x >> 16) & 0xFF),
+		byte((x >> 24) & 0xFF),
+	}
 }
 
 // encoded format is:
