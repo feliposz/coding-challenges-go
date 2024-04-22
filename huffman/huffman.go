@@ -10,11 +10,14 @@ import (
 	"strconv"
 )
 
+var debugMode bool
+
 func main() {
 	var compressMode, decompressMode, showHelp bool
 
 	flag.BoolVar(&compressMode, "c", false, "compress filename to output")
 	flag.BoolVar(&decompressMode, "d", false, "decompress filename to output")
+	flag.BoolVar(&debugMode, "debug", false, "print lots of debug information")
 	flag.BoolVar(&showHelp, "h", false, "display this help information")
 	flag.Parse()
 
@@ -57,7 +60,7 @@ func main() {
 	}
 }
 
-func compressFile(input *os.File, output *os.File) {
+func compressFile(input io.Reader, output io.Writer) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		panic(err)
@@ -71,9 +74,8 @@ func compressFile(input *os.File, output *os.File) {
 		freq[b]++
 	}
 
-	debugFreqTable := false
-
-	if debugFreqTable {
+	if debugMode {
+		fmt.Println("[DEBUG] Frequency table")
 		for code, count := range freq {
 			fmt.Printf("%6d %c %02x  ", count, toPrintable(byte(code)), code)
 			if (code+1)%8 == 0 {
@@ -105,16 +107,16 @@ func compressFile(input *os.File, output *os.File) {
 
 	huffTree := heap.Pop(hnHeap).(*HuffNode)
 
-	debugHuffTree := false
-	if debugHuffTree {
+	if debugMode {
+		fmt.Println("[DEBUG] Huffman Binary Tree")
 		printTree(huffTree, 0)
 	}
 
 	prefixCodeTable := [256][]int{}
 	buildPrefixCodeTable(huffTree, []int{}, &prefixCodeTable)
 
-	debugPrefixTable := false
-	if debugPrefixTable {
+	if debugMode {
+		fmt.Println("[DEBUG] Prefix Table")
 		printPrefixTable(&prefixCodeTable)
 	}
 
@@ -124,13 +126,16 @@ func compressFile(input *os.File, output *os.File) {
 		predictedCompressedSize += count * len(prefixCodeTable[byte(code)])
 	}
 	predictedCompressedSize = (predictedCompressedSize + 7) / 8
-	fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
-	fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
+	if debugMode {
+		fmt.Println("[DEBUG] Compression size")
+		fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
+		fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
+	}
 
 	encodedTable := encodePrefixTable(&prefixCodeTable)
 
-	debugDecoding := false
-	if debugDecoding {
+	if debugMode {
+		fmt.Println("[DEBUG] Decoded table")
 		testDecodedTable := decodePrefixTable(encodedTable)
 
 		for i := range prefixCodeTable {
@@ -171,7 +176,7 @@ func compressFile(input *os.File, output *os.File) {
 	output.Write(compressedData)
 }
 
-func decompressFile(input *os.File, output *os.File) {
+func decompressFile(input io.Reader, output io.Writer) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		panic(err)
@@ -185,14 +190,24 @@ func decompressFile(input *os.File, output *os.File) {
 	compressedDataLength := bytesToUint32(data[8:12])
 	encodedTableLength := bytesToUint32(data[12:16])
 
-	fmt.Println(decompressedDataLength, compressedDataLength, encodedTableLength)
+	if debugMode {
+		fmt.Println("[DEBUG] Header lenghts")
+		fmt.Printf("Decompressed Length: %d\nCompressed Length: %d\nEncoded Prefix Table Length: %d\n", decompressedDataLength, compressedDataLength, encodedTableLength)
+	}
 	encodedTable := data[16 : encodedTableLength+16]
 
 	prefixTable := decodePrefixTable(encodedTable)
-	// printPrefixTable(&prefixTable)
+
+	if debugMode {
+		fmt.Println("[DEBUG] Decoded prefix table")
+		printPrefixTable(&prefixTable)
+	}
 
 	root := buildHuffmanTree(&prefixTable)
-	// printTree(root, 0)
+	if debugMode {
+		fmt.Println("[DEBUG] Decoded Huffman binary tree")
+		printTree(root, 0)
+	}
 
 	outData := make([]byte, 0, decompressedDataLength)
 

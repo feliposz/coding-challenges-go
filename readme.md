@@ -9,7 +9,7 @@ My solutions written in Go for the [Coding Challenges](https://codingchallenges.
 - [x] #0 [Coding Challenges - Intro](https://codingchallenges.fyi/challenges/intro)
 - [x] #1 [Build Your Own wc Tool](https://codingchallenges.fyi/challenges/challenge-wc)
 - [x] #2 [Build Your Own JSON Parser](https://codingchallenges.fyi/challenges/challenge-json-parser)
-- [ ] #3 [Build Your Own Compression Tool](https://codingchallenges.fyi/challenges/challenge-huffman)
+- [x] #3 [Build Your Own Compression Tool](https://codingchallenges.fyi/challenges/challenge-huffman)
 - [ ] #4 [Build Your Own cut Tool](https://codingchallenges.fyi/challenges/challenge-cut)
 - [ ] #5 [Build You Own Load Balancer](https://codingchallenges.fyi/challenges/challenge-load-balancer)
 - [ ] #6 [Build Your Own Sort Tool](https://codingchallenges.fyi/challenges/challenge-sort)
