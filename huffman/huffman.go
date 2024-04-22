@@ -185,6 +185,34 @@ func decompressFile(input *os.File, output *os.File) {
 
 	prefixTable := decodePrefixTable(encodedTable)
 	printPrefixTable(&prefixTable)
+
+	root := buildHuffmanTree(&prefixTable)
+	printTree(root, 0)
+}
+
+func buildHuffmanTree(prefixTable *[256][]int) *HuffNode {
+	root := &HuffNode{0, false, 0, nil, nil}
+	for code, prefix := range *prefixTable {
+		node := root
+		for i, bit := range prefix {
+			if bit == 0 {
+				if node.Left == nil {
+					node.Left = &HuffNode{0, false, 0, nil, nil}
+				}
+				node = node.Left
+			} else {
+				if node.Right == nil {
+					node.Right = &HuffNode{0, false, 0, nil, nil}
+				}
+				node = node.Right
+			}
+			if i == len(prefix)-1 {
+				node.IsLeaf = true
+				node.Code = byte(code)
+			}
+		}
+	}
+	return root
 }
 
 func uint32ToBytes(x uint32) []byte {
