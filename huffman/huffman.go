@@ -52,7 +52,7 @@ func main() {
 	if compressMode {
 		compressFile(input, output)
 	} else {
-		panic("not implemented")
+		decompressFile(input, output)
 	}
 }
 
@@ -114,17 +114,7 @@ func compressFile(input *os.File, output *os.File) {
 
 	debugPrefixTable := false
 	if debugPrefixTable {
-		minLen, maxLen := 1000000, 0
-		for code, prefix := range prefixCodeTable {
-			if len(prefix) == 0 {
-				continue
-			}
-			minLen = min(minLen, len(prefix))
-			maxLen = max(maxLen, len(prefix))
-			fmt.Printf("'%c' %d %v\n", toPrintable(byte(code)), code, prefix)
-		}
-
-		// fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
+		printPrefixTable(&prefixCodeTable)
 	}
 
 	originalSize := len(data)
@@ -176,6 +166,27 @@ func compressFile(input *os.File, output *os.File) {
 	output.Write(compressedData)
 }
 
+func decompressFile(input *os.File, output *os.File) {
+	data, err := io.ReadAll(input)
+	if err != nil {
+		panic(err)
+	}
+
+	if string(data[0:4]) != "CCHF" {
+		panic("not a valid huffman compressed file")
+	}
+
+	decompressedDataLength := bytesToUint32(data[4:8])
+	compressedDataLength := bytesToUint32(data[8:12])
+	encodedTableLength := bytesToUint32(data[12:16])
+
+	fmt.Println(decompressedDataLength, compressedDataLength, encodedTableLength)
+	encodedTable := data[16 : encodedTableLength+16]
+
+	prefixTable := decodePrefixTable(encodedTable)
+	printPrefixTable(&prefixTable)
+}
+
 func uint32ToBytes(x uint32) []byte {
 	return []byte{
 		byte(x & 0xFF),
@@ -183,6 +194,24 @@ func uint32ToBytes(x uint32) []byte {
 		byte((x >> 16) & 0xFF),
 		byte((x >> 24) & 0xFF),
 	}
+}
+
+func bytesToUint32(b []byte) uint32 {
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+}
+
+func printPrefixTable(prefixCodeTable *[256][]int) {
+	minLen, maxLen := 1000000, 0
+	for code, prefix := range prefixCodeTable {
+		if len(prefix) == 0 {
+			continue
+		}
+		minLen = min(minLen, len(prefix))
+		maxLen = max(maxLen, len(prefix))
+		fmt.Printf("'%c' %d %v\n", toPrintable(byte(code)), code, prefix)
+	}
+
+	fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
 }
 
 // encoded format is:
@@ -243,7 +272,7 @@ func decodePrefixTable(encoded []byte) (result [256][]int) {
 		i++
 		bits := encoded[i]
 		i++
-		fmt.Printf("decoding code:%d bits:%d prefix:", code, bits)
+		// fmt.Printf("decoding code:%d bits:%d prefix:", code, bits)
 		prefix := make([]int, 0, bits)
 		shift := 8
 		for bit := 1; bit <= int(bits); bit++ {
@@ -254,7 +283,7 @@ func decodePrefixTable(encoded []byte) (result [256][]int) {
 				i++
 			}
 		}
-		fmt.Println(prefix)
+		// fmt.Println(prefix)
 		result[code] = prefix
 	}
 	return
