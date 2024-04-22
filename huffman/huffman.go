@@ -102,14 +102,16 @@ func main() {
 	encoded := encodePrefixTable(&prefixCodeTable)
 	fmt.Println(len(encoded), encoded)
 
-	testPrefixCodeTable := decodePrefixTable(encoded)
+	testDecodedTable := decodePrefixTable(encoded)
 
 	for i := range prefixCodeTable {
-		if slices.Compare(prefixCodeTable[i], testPrefixCodeTable[i]) != 0 {
-			fmt.Println(i, prefixCodeTable[i], testPrefixCodeTable[i])
+		if slices.Compare(prefixCodeTable[i], testDecodedTable[i]) != 0 {
+			fmt.Println(i, prefixCodeTable[i], testDecodedTable[i])
 			panic("decoded prefix is different")
 		}
 	}
+
+	fmt.Println("Encoded and decoded tables match!")
 }
 
 // encoded format is:
@@ -143,12 +145,14 @@ func encodePrefixTable(prefixCodeTable *[256][]int) []byte {
 		}
 		result = append(result, byte(code), byte(bits))
 		prefixByte := byte(0)
+		shift := 8
 		for i, bit := range prefix {
-			prefixByte = prefixByte<<1 | byte(bit)
-			switch i + 1 {
-			case 8, 16, 24, 32, len(prefix):
+			shift--
+			prefixByte |= byte(bit) << shift
+			if shift == 0 || i == len(prefix)-1 {
 				result = append(result, prefixByte)
 				prefixByte = 0
+				shift = 8
 			}
 		}
 	}
@@ -161,18 +165,20 @@ func decodePrefixTable(encoded []byte) (result [256][]int) {
 		prefixTableSize = 256
 	}
 	i := 1
-	for i < len(encoded) {
+	entries := 0
+	for entries < prefixTableSize && i < len(encoded) {
+		entries++
 		code := encoded[i]
 		i++
 		bits := encoded[i]
 		i++
-		fmt.Printf("decoding code: %d bits: %d prefix: ", code, bits)
+		fmt.Printf("decoding code:%d bits:%d prefix:", code, bits)
 		prefix := make([]int, 0, bits)
 		shift := 8
-		for j := 0; j < int(bits); j++ {
+		for bit := 1; bit <= int(bits); bit++ {
 			shift--
 			prefix = append(prefix, int(encoded[i]>>shift&1))
-			if shift == 0 {
+			if shift == 0 || bit == int(bits) {
 				shift = 8
 				i++
 			}
