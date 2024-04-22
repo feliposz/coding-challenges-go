@@ -72,14 +72,22 @@ func main() {
 		printTree(huffTree, 0)
 	}
 
-	prefixCodeTable := map[byte][]int{}
-	buildPrefixCodeTable(huffTree, []int{}, prefixCodeTable)
+	prefixCodeTable := [256][]int{}
+	buildPrefixCodeTable(huffTree, []int{}, &prefixCodeTable)
 
 	debugPrefixTable := true
 	if debugPrefixTable {
+		minLen, maxLen := 1000000, 0
 		for code, prefix := range prefixCodeTable {
-			fmt.Printf("'%c' %d %v\n", toPrintable(code), code, prefix)
+			if len(prefix) == 0 {
+				continue
+			}
+			minLen = min(minLen, len(prefix))
+			maxLen = max(maxLen, len(prefix))
+			fmt.Printf("'%c' %d %v\n", toPrintable(byte(code)), code, prefix)
 		}
+
+		fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
 
 		originalSize := len(data)
 		predictedCompressedSize := 0
@@ -90,9 +98,55 @@ func main() {
 		fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
 		fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
 	}
+
+	encoded := encodePrefixTable(&prefixCodeTable)
+	fmt.Println(len(encoded), encoded)
 }
 
-func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable map[byte][]int) {
+// encoded format is:
+// 1 byte = number of entries (1-256, 0 == 256)
+// each entry is:
+// 1 byte = character code
+// 1 byte = number of bits on the prefix (1-255)
+// N bytes = bits for the prefix padded with zeros
+
+func encodePrefixTable(prefixCodeTable *[256][]int) []byte {
+	result := []byte{}
+
+	prefixTableSize := 0
+	for _, prefix := range prefixCodeTable {
+		if len(prefix) > 0 {
+			prefixTableSize++
+		}
+	}
+	if prefixTableSize == 0 || prefixTableSize > 256 {
+		panic("invalid prefix table size")
+	}
+	// WARNING: in fact 256 == 0 for our purposes!
+	result = append(result, byte(prefixTableSize))
+	for code, prefix := range prefixCodeTable {
+		bits := len(prefix)
+		if bits == 0 {
+			continue
+		}
+		if bits > 255 {
+			panic("invalid prefix length")
+		}
+		result = append(result, byte(code), byte(bits))
+		prefixByte := byte(0)
+		for i, bit := range prefix {
+			prefixByte = prefixByte<<1 | byte(bit)
+			switch i + 1 {
+			case 8, 16, 24, 32, len(prefix):
+				result = append(result, prefixByte)
+				prefixByte = 0
+			}
+		}
+	}
+	return result
+}
+
+func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable *[256][]int) {
 	if node.IsLeaf {
 		prefixCodeTable[node.Code] = prefix
 	}
