@@ -30,8 +30,8 @@ func TestCompressAndDecompress(t *testing.T) {
 		compressed := new(bytes.Buffer)
 		decompressed := new(bytes.Buffer)
 
-		compressFile(bytes.NewReader(original), compressed)
-		decompressFile(compressed, decompressed)
+		compress(bytes.NewReader(original), compressed)
+		decompress(compressed, decompressed)
 
 		if slices.Compare(original, decompressed.Bytes()) != 0 {
 			t.Errorf("decompression test #%d failed. want: %q - got: %q\n", i, original, decompressed.Bytes())

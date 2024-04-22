@@ -21,13 +21,9 @@ func main() {
 	flag.BoolVar(&showHelp, "h", false, "display this help information")
 	flag.Parse()
 
-	if !flag.Parsed() {
+	if showHelp || !flag.Parsed() {
 		fmt.Fprintln(os.Stderr, "Usage: huffman [-c|-d] <filename> <output>")
-		os.Exit(1)
-	}
-
-	if showHelp {
-		flag.Usage()
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
@@ -54,13 +50,13 @@ func main() {
 	defer output.Close()
 
 	if compressMode {
-		compressFile(input, output)
+		compress(input, output)
 	} else {
-		decompressFile(input, output)
+		decompress(input, output)
 	}
 }
 
-func compressFile(input io.Reader, output io.Writer) {
+func compress(input io.Reader, output io.Writer) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		panic(err)
@@ -68,7 +64,7 @@ func compressFile(input io.Reader, output io.Writer) {
 
 	// build character frequency table
 
-	freq := [256]int{}
+	freq := make([]int, 256)
 
 	for _, b := range data {
 		freq[b]++
@@ -84,46 +80,25 @@ func compressFile(input io.Reader, output io.Writer) {
 		}
 	}
 
-	// build a heap with nodes sorted by frequency count
-
-	hnHeap := &HuffNodeHeap{}
-
-	heap.Init(hnHeap)
-
-	for code, count := range freq {
-		if count > 0 {
-			heap.Push(hnHeap, &HuffNode{count, true, byte(code), nil, nil})
-		}
-	}
-
-	// build a binary tree of the nodes
-	// https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html#building-huffman-coding-trees
-
-	for len(*hnHeap) > 1 {
-		left := heap.Pop(hnHeap).(*HuffNode)
-		right := heap.Pop(hnHeap).(*HuffNode)
-		heap.Push(hnHeap, &HuffNode{left.Weight + right.Weight, false, 0, left, right})
-	}
-
-	huffTree := heap.Pop(hnHeap).(*HuffNode)
+	huffTree := buildHuffmanTreeFromFreq(freq)
 
 	if debugMode {
 		fmt.Println("[DEBUG] Huffman Binary Tree")
 		printTree(huffTree, 0)
 	}
 
-	prefixCodeTable := [256][]int{}
-	buildPrefixCodeTable(huffTree, []int{}, &prefixCodeTable)
+	prefixCodeTable := make([][]int, 256)
+	buildPrefixCodeTable(huffTree, []int{}, prefixCodeTable)
 
 	if debugMode {
 		fmt.Println("[DEBUG] Prefix Table")
-		printPrefixTable(&prefixCodeTable)
+		printPrefixTable(prefixCodeTable)
 	}
 
 	originalSize := len(data)
 	predictedCompressedSize := 0
 	for code, count := range freq {
-		predictedCompressedSize += count * len(prefixCodeTable[byte(code)])
+		predictedCompressedSize += count * len(prefixCodeTable[code])
 	}
 	predictedCompressedSize = (predictedCompressedSize + 7) / 8
 	if debugMode {
@@ -132,7 +107,7 @@ func compressFile(input io.Reader, output io.Writer) {
 		fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
 	}
 
-	encodedTable := encodePrefixTable(&prefixCodeTable)
+	encodedTable := encodePrefixTable(prefixCodeTable)
 
 	if debugMode {
 		fmt.Println("[DEBUG] Decoded table")
@@ -176,7 +151,7 @@ func compressFile(input io.Reader, output io.Writer) {
 	output.Write(compressedData)
 }
 
-func decompressFile(input io.Reader, output io.Writer) {
+func decompress(input io.Reader, output io.Writer) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		panic(err)
@@ -200,10 +175,10 @@ func decompressFile(input io.Reader, output io.Writer) {
 
 	if debugMode {
 		fmt.Println("[DEBUG] Decoded prefix table")
-		printPrefixTable(&prefixTable)
+		printPrefixTable(prefixTable)
 	}
 
-	root := buildHuffmanTree(&prefixTable)
+	root := buildHuffmanTreeFromTable(prefixTable)
 	if debugMode {
 		fmt.Println("[DEBUG] Decoded Huffman binary tree")
 		printTree(root, 0)
@@ -237,31 +212,6 @@ outer:
 	output.Write(outData)
 }
 
-func buildHuffmanTree(prefixTable *[256][]int) *HuffNode {
-	root := &HuffNode{0, false, 0, nil, nil}
-	for code, prefix := range *prefixTable {
-		node := root
-		for i, bit := range prefix {
-			if bit == 0 {
-				if node.Left == nil {
-					node.Left = &HuffNode{0, false, 0, nil, nil}
-				}
-				node = node.Left
-			} else {
-				if node.Right == nil {
-					node.Right = &HuffNode{0, false, 0, nil, nil}
-				}
-				node = node.Right
-			}
-			if i == len(prefix)-1 {
-				node.IsLeaf = true
-				node.Code = byte(code)
-			}
-		}
-	}
-	return root
-}
-
 func uint32ToBytes(x uint32) []byte {
 	return []byte{
 		byte(x & 0xFF),
@@ -275,7 +225,14 @@ func bytesToUint32(b []byte) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
 
-func printPrefixTable(prefixCodeTable *[256][]int) {
+func toPrintable(ch byte) byte {
+	if ch < 32 || ch > 127 {
+		return '?'
+	}
+	return ch
+}
+
+func printPrefixTable(prefixCodeTable [][]int) {
 	minLen, maxLen := 1000000, 0
 	for code, prefix := range prefixCodeTable {
 		if len(prefix) == 0 {
@@ -296,7 +253,7 @@ func printPrefixTable(prefixCodeTable *[256][]int) {
 // 1 byte = number of bits on the prefix (1-255)
 // N bytes = bits for the prefix padded with zeros
 
-func encodePrefixTable(prefixCodeTable *[256][]int) []byte {
+func encodePrefixTable(prefixCodeTable [][]int) []byte {
 	result := []byte{}
 
 	prefixTableSize := 0
@@ -334,7 +291,9 @@ func encodePrefixTable(prefixCodeTable *[256][]int) []byte {
 	return result
 }
 
-func decodePrefixTable(encoded []byte) (result [256][]int) {
+func decodePrefixTable(encoded []byte) (result [][]int) {
+	result = make([][]int, 256)
+
 	prefixTableSize := int(encoded[0])
 	if prefixTableSize == 0 {
 		prefixTableSize = 256
@@ -364,7 +323,7 @@ func decodePrefixTable(encoded []byte) (result [256][]int) {
 	return
 }
 
-func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable *[256][]int) {
+func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable [][]int) {
 	if node.IsLeaf {
 		prefixCodeTable[node.Code] = prefix
 	}
@@ -392,11 +351,56 @@ func printTree(node *HuffNode, depth int) {
 	printTree(node.Right, depth+1)
 }
 
-func toPrintable(ch byte) byte {
-	if ch < 32 || ch > 127 {
-		return '?'
+func buildHuffmanTreeFromTable(prefixTable [][]int) *HuffNode {
+	root := &HuffNode{0, false, 0, nil, nil}
+	for code, prefix := range prefixTable {
+		node := root
+		for i, bit := range prefix {
+			if bit == 0 {
+				if node.Left == nil {
+					node.Left = &HuffNode{0, false, 0, nil, nil}
+				}
+				node = node.Left
+			} else {
+				if node.Right == nil {
+					node.Right = &HuffNode{0, false, 0, nil, nil}
+				}
+				node = node.Right
+			}
+			if i == len(prefix)-1 {
+				node.IsLeaf = true
+				node.Code = byte(code)
+			}
+		}
 	}
-	return ch
+	return root
+}
+
+func buildHuffmanTreeFromFreq(freq []int) *HuffNode {
+	// build a heap with nodes sorted by frequency count
+
+	hnHeap := &HuffNodeHeap{}
+
+	heap.Init(hnHeap)
+
+	for code, count := range freq {
+		if count > 0 {
+			heap.Push(hnHeap, &HuffNode{count, true, byte(code), nil, nil})
+		}
+	}
+
+	// build a binary tree of the nodes
+	// https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html#building-huffman-coding-trees
+
+	for len(*hnHeap) > 1 {
+		left := heap.Pop(hnHeap).(*HuffNode)
+		right := heap.Pop(hnHeap).(*HuffNode)
+		heap.Push(hnHeap, &HuffNode{left.Weight + right.Weight, false, 0, left, right})
+	}
+
+	huffTree := heap.Pop(hnHeap).(*HuffNode)
+
+	return huffTree
 }
 
 type HuffNode struct {
