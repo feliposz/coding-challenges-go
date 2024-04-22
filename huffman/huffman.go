@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 )
 
 func main() {
@@ -36,11 +37,7 @@ func main() {
 
 	if debugFreqTable {
 		for code, count := range freq {
-			printable := code
-			if code < 32 || code > 127 {
-				printable = '?'
-			}
-			fmt.Printf("%6d %c %02x  ", count, printable, code)
+			fmt.Printf("%6d %c %02x  ", count, toPrintable(byte(code)), code)
 			if (code+1)%8 == 0 {
 				fmt.Println()
 			}
@@ -60,6 +57,7 @@ func main() {
 	}
 
 	// build a binary tree of the nodes
+	// https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html#building-huffman-coding-trees
 
 	for len(*hnHeap) > 1 {
 		left := heap.Pop(hnHeap).(*HuffNode)
@@ -69,9 +67,40 @@ func main() {
 
 	huffTree := heap.Pop(hnHeap).(*HuffNode)
 
-	debugHuffTree := true
+	debugHuffTree := false
 	if debugHuffTree {
 		printTree(huffTree, 0)
+	}
+
+	prefixCodeTable := map[byte][]int{}
+	buildPrefixCodeTable(huffTree, []int{}, prefixCodeTable)
+
+	debugPrefixTable := true
+	if debugPrefixTable {
+		for code, prefix := range prefixCodeTable {
+			fmt.Printf("'%c' %d %v\n", toPrintable(code), code, prefix)
+		}
+
+		originalSize := len(data)
+		predictedCompressedSize := 0
+		for code, count := range freq {
+			predictedCompressedSize += count * len(prefixCodeTable[byte(code)])
+		}
+		predictedCompressedSize = (predictedCompressedSize + 7) / 8
+		fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
+		fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
+	}
+}
+
+func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable map[byte][]int) {
+	if node.IsLeaf {
+		prefixCodeTable[node.Code] = prefix
+	}
+	if node.Left != nil {
+		buildPrefixCodeTable(node.Left, append(slices.Clone(prefix), 0), prefixCodeTable)
+	}
+	if node.Right != nil {
+		buildPrefixCodeTable(node.Right, append(slices.Clone(prefix), 1), prefixCodeTable)
 	}
 }
 
@@ -85,14 +114,17 @@ func printTree(node *HuffNode, depth int) {
 	if !node.IsLeaf {
 		fmt.Printf("node weight:%d\n", node.Weight)
 	} else {
-		printable := node.Code
-		if printable < 32 || printable > 127 {
-			printable = '?'
-		}
-		fmt.Printf("char:'%c' code:%02x weight:%d\n", printable, node.Code, node.Weight)
+		fmt.Printf("char:'%c' code:%02x weight:%d\n", toPrintable(node.Code), node.Code, node.Weight)
 	}
 	printTree(node.Left, depth+1)
 	printTree(node.Right, depth+1)
+}
+
+func toPrintable(ch byte) byte {
+	if ch < 32 || ch > 127 {
+		return '?'
+	}
+	return ch
 }
 
 type HuffNode struct {
