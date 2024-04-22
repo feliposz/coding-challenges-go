@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 )
 
 func main() {
@@ -184,10 +185,37 @@ func decompressFile(input *os.File, output *os.File) {
 	encodedTable := data[16 : encodedTableLength+16]
 
 	prefixTable := decodePrefixTable(encodedTable)
-	printPrefixTable(&prefixTable)
+	// printPrefixTable(&prefixTable)
 
 	root := buildHuffmanTree(&prefixTable)
-	printTree(root, 0)
+	// printTree(root, 0)
+
+	outData := make([]byte, 0, decompressedDataLength)
+
+	node := root
+outer:
+	for i := int(encodedTableLength) + 16; i < len(data); i++ {
+		for shift := 7; shift >= 0; shift-- {
+			bit := int(data[i] >> shift & 1)
+			if bit == 0 {
+				node = node.Left
+			} else {
+				node = node.Right
+			}
+			if node == nil {
+				panic("invalid encoding at offset " + strconv.Itoa(i))
+			}
+			if node.IsLeaf {
+				outData = append(outData, node.Code)
+				node = root
+				if len(outData) == int(decompressedDataLength) {
+					break outer
+				}
+			}
+		}
+	}
+
+	output.Write(outData)
 }
 
 func buildHuffmanTree(prefixTable *[256][]int) *HuffNode {
