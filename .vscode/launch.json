@@ -10,8 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args": ["--max-depth", "20", "json_checker/pass2.json"]
-            // "args": ["tests/step0/valid.json"]
+            "args": ["-d", "LesMiserables.cchf", "LesMiserables.out"]
         }
     ]
 }

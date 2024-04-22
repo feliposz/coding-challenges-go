@@ -147,16 +147,20 @@ func compressFile(input *os.File, output *os.File) {
 	compressedData := make([]byte, 0, predictedCompressedSize)
 	outputByte := byte(0)
 	shift := 8
-	for i, code := range data {
+	for _, code := range data {
 		for _, bit := range prefixCodeTable[code] {
 			shift--
 			outputByte |= byte(bit) << shift
-			if shift == 0 || i == len(data)-1 {
+			if shift == 0 {
 				compressedData = append(compressedData, outputByte)
 				outputByte = 0
 				shift = 8
 			}
 		}
+	}
+	// last byte wasn't complete, so write it out
+	if shift != 8 {
+		compressedData = append(compressedData, outputByte)
 	}
 
 	output.Write([]byte("CCHF")) // header
@@ -207,10 +211,10 @@ outer:
 			}
 			if node.IsLeaf {
 				outData = append(outData, node.Code)
-				node = root
 				if len(outData) == int(decompressedDataLength) {
 					break outer
 				}
+				node = root
 			}
 		}
 	}
