@@ -75,7 +75,7 @@ func main() {
 	prefixCodeTable := [256][]int{}
 	buildPrefixCodeTable(huffTree, []int{}, &prefixCodeTable)
 
-	debugPrefixTable := true
+	debugPrefixTable := false
 	if debugPrefixTable {
 		minLen, maxLen := 1000000, 0
 		for code, prefix := range prefixCodeTable {
@@ -88,19 +88,28 @@ func main() {
 		}
 
 		fmt.Printf("minlen: %d\nmaxlen: %d\n", minLen, maxLen)
-
-		originalSize := len(data)
-		predictedCompressedSize := 0
-		for code, count := range freq {
-			predictedCompressedSize += count * len(prefixCodeTable[byte(code)])
-		}
-		predictedCompressedSize = (predictedCompressedSize + 7) / 8
-		fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
-		fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
 	}
+
+	originalSize := len(data)
+	predictedCompressedSize := 0
+	for code, count := range freq {
+		predictedCompressedSize += count * len(prefixCodeTable[byte(code)])
+	}
+	predictedCompressedSize = (predictedCompressedSize + 7) / 8
+	fmt.Printf("original size: %d\npredicted compressed size: %d\n", originalSize, predictedCompressedSize)
+	fmt.Printf("compression ratio: %f\n", float64(predictedCompressedSize)/float64(originalSize))
 
 	encoded := encodePrefixTable(&prefixCodeTable)
 	fmt.Println(len(encoded), encoded)
+
+	testPrefixCodeTable := decodePrefixTable(encoded)
+
+	for i := range prefixCodeTable {
+		if slices.Compare(prefixCodeTable[i], testPrefixCodeTable[i]) != 0 {
+			fmt.Println(i, prefixCodeTable[i], testPrefixCodeTable[i])
+			panic("decoded prefix is different")
+		}
+	}
 }
 
 // encoded format is:
@@ -144,6 +153,34 @@ func encodePrefixTable(prefixCodeTable *[256][]int) []byte {
 		}
 	}
 	return result
+}
+
+func decodePrefixTable(encoded []byte) (result [256][]int) {
+	prefixTableSize := int(encoded[0])
+	if prefixTableSize == 0 {
+		prefixTableSize = 256
+	}
+	i := 1
+	for i < len(encoded) {
+		code := encoded[i]
+		i++
+		bits := encoded[i]
+		i++
+		fmt.Printf("decoding code: %d bits: %d prefix: ", code, bits)
+		prefix := make([]int, 0, bits)
+		shift := 8
+		for j := 0; j < int(bits); j++ {
+			shift--
+			prefix = append(prefix, int(encoded[i]>>shift&1))
+			if shift == 0 {
+				shift = 8
+				i++
+			}
+		}
+		fmt.Println(prefix)
+		result[code] = prefix
+	}
+	return
 }
 
 func buildPrefixCodeTable(node *HuffNode, prefix []int, prefixCodeTable *[256][]int) {
