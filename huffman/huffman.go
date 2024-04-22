@@ -17,11 +17,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
 		panic(err)
 	}
+
+	// build character frequency table
 
 	freq := [256]int{}
 
@@ -44,20 +47,24 @@ func main() {
 		}
 	}
 
+	// build a heap with nodes sorted by frequency count
+
 	hnHeap := &HuffNodeHeap{}
 
 	heap.Init(hnHeap)
 
 	for code, count := range freq {
 		if count > 0 {
-			heap.Push(hnHeap, &HuffNode{count, byte(code), nil, nil})
+			heap.Push(hnHeap, &HuffNode{count, true, byte(code), nil, nil})
 		}
 	}
+
+	// build a binary tree of the nodes
 
 	for len(*hnHeap) > 1 {
 		left := heap.Pop(hnHeap).(*HuffNode)
 		right := heap.Pop(hnHeap).(*HuffNode)
-		heap.Push(hnHeap, &HuffNode{left.Weight + right.Weight, 0, left, right})
+		heap.Push(hnHeap, &HuffNode{left.Weight + right.Weight, false, 0, left, right})
 	}
 
 	huffTree := heap.Pop(hnHeap).(*HuffNode)
@@ -75,7 +82,7 @@ func printTree(node *HuffNode, depth int) {
 	for i := 0; i < depth; i++ {
 		fmt.Print("    ")
 	}
-	if node.Code == 0 {
+	if !node.IsLeaf {
 		fmt.Printf("node weight:%d\n", node.Weight)
 	} else {
 		printable := node.Code
@@ -90,6 +97,7 @@ func printTree(node *HuffNode, depth int) {
 
 type HuffNode struct {
 	Weight int
+	IsLeaf bool
 	Code   byte
 	Left   *HuffNode
 	Right  *HuffNode
