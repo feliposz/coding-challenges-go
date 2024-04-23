@@ -16,7 +16,7 @@ for test in LesMiserables.txt ../readme.md huffman.go huffman.exe; do
     ORIGINAL_SIZE=$(wc -c $test | cut -f1 -d ' ')
     COMPRESSED_SIZE=$(wc -c compressed.cchf | cut -f1 -d ' ')
     DECOMPRESSED_SIZE=$(wc -c decompressed.out | cut -f1 -d ' ')
-    RATIO=$(echo "scale=2; 100 * $COMPRESSED_SIZE / $ORIGINAL_SIZE" | bc)
+    RATIO=$(( 100 * $COMPRESSED_SIZE / $ORIGINAL_SIZE ))
     echo "Original: $ORIGINAL_SIZE, Compressed: $COMPRESSED_SIZE, Ratio: $RATIO%"
 done
 

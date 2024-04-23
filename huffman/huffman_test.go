@@ -10,6 +10,7 @@ func TestCompressAndDecompress(t *testing.T) {
 
 	// simple strings
 	testCases := [][]byte{
+		[]byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 		[]byte("hello huffman"),
 		[]byte("aaabbcaaabbcaaabbcaaabbc"),
 		[]byte("Coding\tChallenges\nAre\tFun!!! :)"),

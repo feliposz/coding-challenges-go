@@ -62,6 +62,10 @@ func compress(input io.Reader, output io.Writer) {
 		panic(err)
 	}
 
+	if len(data) == 0 {
+		panic("input is empty, nothing to compress")
+	}
+
 	// build character frequency table
 
 	freq := make([]int, 256)
@@ -379,26 +383,33 @@ func buildHuffmanTreeFromTable(prefixTable [][]int) *HuffNode {
 func buildHuffmanTreeFromFreq(freq []int) *HuffNode {
 	// build a heap with nodes sorted by frequency count
 
-	hnHeap := &HuffNodeHeap{}
+	hnHeap := HuffNodeHeap{}
 
-	heap.Init(hnHeap)
+	heap.Init(&hnHeap)
 
 	for code, count := range freq {
 		if count > 0 {
-			heap.Push(hnHeap, &HuffNode{count, true, byte(code), nil, nil})
+			heap.Push(&hnHeap, &HuffNode{count, true, byte(code), nil, nil})
 		}
+	}
+
+	// special case: data is just a repeated character, make a 1 node + 1 leaf tree
+	if len(hnHeap) == 1 {
+		left := heap.Pop(&hnHeap).(*HuffNode)
+		node := &HuffNode{left.Weight, false, 0, left, nil}
+		return node
 	}
 
 	// build a binary tree of the nodes
 	// https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html#building-huffman-coding-trees
 
-	for len(*hnHeap) > 1 {
-		left := heap.Pop(hnHeap).(*HuffNode)
-		right := heap.Pop(hnHeap).(*HuffNode)
-		heap.Push(hnHeap, &HuffNode{left.Weight + right.Weight, false, 0, left, right})
+	for len(hnHeap) > 1 {
+		left := heap.Pop(&hnHeap).(*HuffNode)
+		right := heap.Pop(&hnHeap).(*HuffNode)
+		heap.Push(&hnHeap, &HuffNode{left.Weight + right.Weight, false, 0, left, right})
 	}
 
-	huffTree := heap.Pop(hnHeap).(*HuffNode)
+	huffTree := heap.Pop(&hnHeap).(*HuffNode)
 
 	return huffTree
 }
